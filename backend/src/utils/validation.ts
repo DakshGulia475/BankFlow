@@ -50,6 +50,35 @@ export function validateRegisterInput(body: unknown): {
   };
 }
 
+export const MAX_AMOUNT = 1_000_000_000;
+
+export function validateAmount(value: unknown, field = 'amount'): number {
+  const amount = typeof value === 'number' ? value : NaN;
+  const errors: FieldError[] = [];
+
+  if (!Number.isFinite(amount)) {
+    errors.push({ field, message: 'Amount must be a number' });
+  } else if (amount <= 0) {
+    errors.push({ field, message: 'Amount must be greater than zero' });
+  } else if (Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-6) {
+    errors.push({ field, message: 'Amount must have at most 2 decimal places' });
+  } else if (amount > MAX_AMOUNT) {
+    errors.push({ field, message: `Amount must not exceed ${MAX_AMOUNT}` });
+  }
+
+  assertValid(errors);
+  return amount;
+}
+
+export function validateAccountNumber(value: unknown, field = 'toAccountNumber'): string {
+  const errors: FieldError[] = [];
+  if (typeof value !== 'string' || !/^\d{12}$/.test(value.trim())) {
+    errors.push({ field, message: 'Account number must be 12 digits' });
+  }
+  assertValid(errors);
+  return (value as string).trim();
+}
+
 export function validateLoginInput(body: unknown): { email: string; password: string } {
   const { email, password } = (body ?? {}) as Record<string, unknown>;
   const errors: FieldError[] = [];

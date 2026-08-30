@@ -19,7 +19,16 @@ npm run dev            # tsx watch on src/server.ts
 
 Other scripts: `npm run build`, `npm run typecheck`, `npm start`, `npm test`.
 
-Requires a running MongoDB instance reachable at `MONGODB_URI`.
+Requires a running MongoDB instance reachable at `MONGODB_URI`. Transfers use MongoDB multi-document transactions, which need a replica set — a single-node one is enough:
+
+```bash
+# /etc/mongod.conf
+replication:
+  replSetName: rs0
+# then, once: rs.initiate()
+```
+
+On a standalone server the API still works, but transfers fall back to non-atomic sequential updates (see Consistency below).
 
 ## Tests
 
@@ -28,7 +37,7 @@ cd backend
 npm test    # Vitest + Supertest, needs a local MongoDB
 ```
 
-Tests use `TEST_MONGODB_URI` (default `mongodb://127.0.0.1:27017/bankflow_test`) and drop that database when the run finishes.
+Tests use `TEST_MONGODB_URI` (default `mongodb://127.0.0.1:27017/bankflow_test?replicaSet=rs0`) and drop that database when the run finishes.
 
 ## Endpoints
 
@@ -40,8 +49,31 @@ Tests use `TEST_MONGODB_URI` (default `mongodb://127.0.0.1:27017/bankflow_test`)
 | GET    | `/api/auth/me`       | Bearer | Current authenticated user      |
 | POST   | `/api/accounts`      | Bearer | Create the user's account       |
 | GET    | `/api/accounts/me`   | Bearer | Retrieve the user's account     |
+| POST   | `/api/transactions/deposit`  | Bearer | Deposit into own account |
+| POST   | `/api/transactions/withdraw` | Bearer | Withdraw from own account |
+| POST   | `/api/transactions/transfer` | Bearer | Transfer to another account |
+| GET    | `/api/transactions`  | Bearer | Own transaction history, newest first |
 
 One account per user: `Account.userId` is unique, so a second `POST /api/accounts` returns 409.
+
+## Consistency and concurrency
+
+Balances are never read into the application, checked, and written back later. Every balance change is a single conditional atomic update in MongoDB:
+
+```js
+// withdrawal / transfer debit — the balance check is part of the write
+Account.findOneAndUpdate({ _id, balance: { $gte: amount } }, { $inc: { balance: -amount } })
+```
+
+If the account no longer has enough money when the write executes, the update matches nothing and the request fails with 422 instead of overdrawing. Two concurrent withdrawals therefore cannot both succeed against the same funds.
+
+Each operation (balance change plus transaction record) runs inside one MongoDB session transaction, so a transfer either debits the source, credits the destination, and writes the record — or does none of those. Failed operations leave balances untouched.
+
+Limitations:
+
+- Multi-document transactions require a replica set. On a standalone `mongod` the service detects this and runs the same operations without a session: individual balance updates stay atomic, but a crash between the debit and the credit could leave a transfer half-applied. Run a replica set for the atomic behaviour.
+- Balances are stored as floating point numbers rounded to cents after each `$inc`. A production system would use integer minor units or `Decimal128`.
+- Transaction records are only written for successful operations; failures are surfaced as API errors rather than `FAILED` rows.
 
 ## Health check
 
