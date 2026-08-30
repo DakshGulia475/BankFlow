@@ -22,4 +22,6 @@ export const env = {
   mongodbUri: required('MONGODB_URI', 'mongodb://127.0.0.1:27017/bankflow?replicaSet=rs0'),
   jwtSecret: required('JWT_SECRET', 'dev-only-insecure-secret'),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+  /** Comma-separated list of allowed browser origins for the frontend. */
+  corsOrigin: (process.env.CORS_ORIGIN ?? 'http://localhost:5173').split(',').map((o) => o.trim()),
 };

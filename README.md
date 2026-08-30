@@ -6,7 +6,7 @@ Banking transaction management system — an educational/portfolio prototype (no
 
 - Backend: Node.js, Express, TypeScript, MongoDB (Mongoose)
 - Tests: Vitest + Supertest
-- Frontend (later phase): React + Vite + TypeScript
+- Frontend: React + Vite + TypeScript (React Router)
 
 ## Architecture
 
@@ -47,6 +47,19 @@ One account per user: `Account.userId` is unique, so a second `POST /api/account
 
 Records carry a unique `referenceId` (`TXN-<uuid>`), type, amount, source/destination, status and timestamp.
 
+### Frontend
+
+A single-page React app (`frontend/`) talking to the API through one client layer:
+
+```
+pages (Register / Login / Dashboard)
+  -> components (Field, Message, TransactionForms, TransactionHistory)
+  -> hooks (useAuth, useDashboardData)
+  -> services/bankflow.ts  ->  services/apiClient.ts  ->  VITE_API_BASE_URL
+```
+
+`apiClient` is the only place that calls `fetch`: it attaches the bearer token, parses the API error envelope into an `ApiError` (`status`, `code`, `displayMessage` including field details) and turns network failures into a readable error. `AuthProvider` keeps the JWT in `localStorage`, re-validates it with `GET /api/auth/me` on load, and logs out on any 401; `ProtectedRoute` guards `/dashboard`. The dashboard loads `GET /api/accounts/me` (404 -> "Create account" action) plus `GET /api/transactions`, and refreshes both after every deposit, withdrawal or transfer.
+
 ## Backend setup
 
 ```bash
@@ -68,6 +81,19 @@ replication:
 ```
 
 On a standalone server the API still works, but transfers fall back to non-atomic sequential updates (see Consistency below).
+
+## Frontend setup
+
+Needs Node `^20.19 || >=22.12` (see `frontend/.nvmrc`).
+
+```bash
+cd frontend
+npm install
+cp .env.example .env   # VITE_API_BASE_URL, default http://localhost:4000
+npm run dev            # http://localhost:5173
+```
+
+Other scripts: `npm run build`, `npm run typecheck`, `npm run preview`. The backend must allow the frontend origin via `CORS_ORIGIN` (defaults to `http://localhost:5173`).
 
 ## Tests
 
@@ -115,6 +141,8 @@ Each operation (balance change plus transaction record) runs inside one MongoDB 
 - Monetary values use JavaScript floating point numbers rounded to cents, not integer minor units or `Decimal128`.
 - MongoDB sessions require replica-set support; without it the operations are not atomic across documents.
 - Failed operations return API errors and do not create `FAILED` transaction records.
+- The frontend stores the JWT in `localStorage` (simple and readable for a prototype, but readable by any script on the page) and has no token refresh — an expired token logs the user out.
+- Transaction history is unpaginated.
 - Multi-document transactions require a replica set. On a standalone `mongod` the service detects this and runs the same operations without a session: individual balance updates stay atomic, but a crash between the debit and the credit could leave a transfer half-applied. Run a replica set for the atomic behaviour.
 - Balances are stored as floating point numbers rounded to cents after each `$inc`. A production system would use integer minor units or `Decimal128`.
 - Transaction records are only written for successful operations; failures are surfaced as API errors rather than `FAILED` rows.
@@ -166,4 +194,12 @@ backend/
     app.ts
     server.ts
   tests/
+frontend/
+  src/
+    components/
+    hooks/
+    pages/
+    services/  apiClient + typed endpoint wrappers
+    types/
+    utils/
 ```
