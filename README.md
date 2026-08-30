@@ -21,6 +21,24 @@ Other scripts: `npm run build`, `npm run typecheck`, `npm start`, `npm test`.
 
 Requires a running MongoDB instance reachable at `MONGODB_URI`.
 
+## Tests
+
+```bash
+cd backend
+npm test    # Vitest + Supertest, needs a local MongoDB
+```
+
+Tests use `TEST_MONGODB_URI` (default `mongodb://127.0.0.1:27017/bankflow_test`) and drop that database when the run finishes.
+
+## Endpoints
+
+| Method | Path                 | Auth   | Description                     |
+| ------ | -------------------- | ------ | ------------------------------- |
+| GET    | `/api/health`        | no     | Service + database health       |
+| POST   | `/api/auth/register` | no     | Create a user                   |
+| POST   | `/api/auth/login`    | no     | Exchange credentials for a JWT  |
+| GET    | `/api/auth/me`       | Bearer | Current authenticated user      |
+
 ## Health check
 
 ```
