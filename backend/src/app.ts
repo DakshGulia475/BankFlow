@@ -5,7 +5,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 export function createApp() {
   const app = express();
 
-  app.use(express.json());
+  app.disable('x-powered-by');
+  app.use(express.json({ limit: '10kb' }));
   app.use('/api', apiRouter);
 
   app.use(notFoundHandler);

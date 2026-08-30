@@ -7,6 +7,15 @@ export function notFoundHandler(req: Request, _res: Response, next: NextFunction
   next(ApiError.notFound(`Route ${req.method} ${req.path} not found`));
 }
 
+function isBodyParserError(err: unknown): err is Error & { status: number } {
+  return (
+    err instanceof Error &&
+    'status' in err &&
+    typeof (err as { status: unknown }).status === 'number' &&
+    'body' in err
+  );
+}
+
 export function errorHandler(
   err: unknown,
   _req: Request,
@@ -32,6 +41,10 @@ export function errorHandler(
     statusCode = 400;
     code = 'VALIDATION_ERROR';
     message = 'Invalid identifier';
+  } else if (isBodyParserError(err)) {
+    statusCode = err.status;
+    code = statusCode === 413 ? 'PAYLOAD_TOO_LARGE' : 'VALIDATION_ERROR';
+    message = statusCode === 413 ? 'Request body is too large' : 'Request body is not valid JSON';
   }
 
   if (statusCode >= 500 && env.nodeEnv !== 'test') {
