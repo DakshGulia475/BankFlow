@@ -38,6 +38,10 @@ Tests use `TEST_MONGODB_URI` (default `mongodb://127.0.0.1:27017/bankflow_test`)
 | POST   | `/api/auth/register` | no     | Create a user                   |
 | POST   | `/api/auth/login`    | no     | Exchange credentials for a JWT  |
 | GET    | `/api/auth/me`       | Bearer | Current authenticated user      |
+| POST   | `/api/accounts`      | Bearer | Create the user's account       |
+| GET    | `/api/accounts/me`   | Bearer | Retrieve the user's account     |
+
+One account per user: `Account.userId` is unique, so a second `POST /api/accounts` returns 409.
 
 ## Health check
 
